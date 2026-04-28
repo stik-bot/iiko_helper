@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+
+@dataclass(slots=True)
+class Settings:
+    telegram_bot_token: str
+    gemini_api_key: str
+    gemini_model: str
+    log_path: Path
+    log_level: str
+    storage_dir: Path
+    knowledge_base_path: Path
+
+
+def load_settings() -> Settings:
+    token = os.getenv("BOT_TOKEN", "").strip() or os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite").strip() or "gemini-2.5-flash-lite"
+    log_path = Path(os.getenv("LOG_PATH", "logs/iiko_knowledge_bot.log")).resolve()
+    storage_dir = Path(os.getenv("STORAGE_DIR", "storage")).resolve()
+    knowledge_base_path = Path(os.getenv("KNOWLEDGE_BASE_PATH", "knowledge/iiko_sources.json")).resolve()
+    log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO"
+
+    if not token:
+        raise ValueError("BOT_TOKEN or TELEGRAM_BOT_TOKEN is required.")
+    if not gemini_api_key:
+        raise ValueError("GEMINI_API_KEY is required.")
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    knowledge_base_path.parent.mkdir(parents=True, exist_ok=True)
+
+    return Settings(
+        telegram_bot_token=token,
+        gemini_api_key=gemini_api_key,
+        gemini_model=gemini_model,
+        log_path=log_path,
+        log_level=log_level,
+        storage_dir=storage_dir,
+        knowledge_base_path=knowledge_base_path,
+    )
