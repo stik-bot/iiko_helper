@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: web
     name: iiko-helper-bot
     runtime: python
     plan: free
