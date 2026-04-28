@@ -1,0 +1,23 @@
+services:
+  - type: worker
+    name: iiko-helper-bot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash-lite
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_PATH
+        value: logs/iiko_knowledge_bot.log
+      - key: STORAGE_DIR
+        value: storage
+      - key: KNOWLEDGE_BASE_PATH
+        value: knowledge/iiko_sources.json
