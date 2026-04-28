@@ -87,7 +87,7 @@ class GeminiService:
             "Старайся опираться на официальную базу знаний iiko и cloud API docs, которые даны ниже. "
             "Если вопрос просит инструкцию, отвечай строго пошагово, без воды, с названиями разделов меню. "
             "Не выдумывай шаги и пункты меню, которых нет в контексте. "
-            "Если это тест или вопрос с вариантами ответа, не предполагай автоматически, что правильный вариант только один. "
+            "Если это тест или вопрос с вариантами ответа, не предполагай автоматически, что правильный вариант только один. "
             "Сначала проверь, может ли правильных вариантов быть несколько. "
             "Если правильных вариантов несколько, перечисли все. "
             "Если правильный вариант один, так и напиши. "
@@ -113,6 +113,16 @@ class GeminiService:
     def _is_quota_error(text: str) -> bool:
         lowered = text.lower()
         return "429" in lowered or "resource_exhausted" in lowered or "quota" in lowered
+
+    @staticmethod
+    def _is_temporary_unavailable_error(text: str) -> bool:
+        lowered = text.lower()
+        return (
+            "503" in lowered
+            or "unavailable" in lowered
+            or "high demand" in lowered
+            or "try again later" in lowered
+        )
 
     @staticmethod
     def _is_missing_model_error(text: str) -> bool:
@@ -144,6 +154,11 @@ class GeminiService:
             if retry_after is not None:
                 message += f" Попробуй снова примерно через {retry_after} сек."
             raise GeminiQuotaError(message, retry_after_seconds=retry_after) from exc
+        if GeminiService._is_temporary_unavailable_error(raw):
+            retry_after = GeminiService._extract_retry_seconds(raw) or 20
+            message = "Gemini временно перегружен."
+            message += f" Попробуй снова примерно через {retry_after} сек."
+            raise GeminiQuotaError(message, retry_after_seconds=retry_after) from exc
         raise RuntimeError(raw) from exc
 
     def _generate_with_fallback(self, contents: Any):
@@ -156,7 +171,7 @@ class GeminiService:
                 raw = str(exc)
                 if self._is_missing_model_error(raw):
                     continue
-                if not self._is_quota_error(raw):
+                if not self._is_quota_error(raw) and not self._is_temporary_unavailable_error(raw):
                     self._raise_friendly_error(exc)
         if last_error is not None:
             self._raise_friendly_error(last_error)
