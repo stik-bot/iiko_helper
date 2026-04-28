@@ -1,36 +1,36 @@
 # iiko Knowledge Bot
 
-Telegram-бот на `aiogram`, который:
+Telegram bot on `aiogram` that:
 
-- отвечает на вопросы по iiko;
-- использует `Gemini` для анализа текстовых вопросов;
-- принимает фото с тестами, вопросами и скриншотами;
-- подсказывает ответы по локальной базе знаний и через Gemini.
+- answers iiko questions;
+- uses `Gemini` for text and image-based questions;
+- accepts photos with tests, screenshots, and tasks;
+- uses a local iiko knowledge base plus Gemini.
 
-## Возможности
+## Features
 
-- текстовые вопросы по iiko;
-- разбор фото с тестами и несколькими вариантами ответа;
-- ответы на русском языке;
-- ссылки на релевантные источники в ответе;
-- готовность к запуску локально и на Railway.
+- text Q&A about iiko;
+- photo test analysis, including questions with multiple answer options;
+- Russian-language answers;
+- source links in replies;
+- ready for local run and Render deploy.
 
-## Команды
+## Commands
 
 - `/start`
 - `/help`
 - `/sources`
 
-## Локальный запуск
+## Local Run
 
 ```powershell
 python -m pip install -r requirements.txt
 python bot.py
 ```
 
-## Переменные окружения
+## Environment Variables
 
-- `BOT_TOKEN` или `TELEGRAM_BOT_TOKEN`
+- `BOT_TOKEN` or `TELEGRAM_BOT_TOKEN`
 - `GEMINI_API_KEY`
 - `GEMINI_MODEL`
 - `LOG_PATH`
@@ -38,15 +38,17 @@ python bot.py
 - `STORAGE_DIR`
 - `KNOWLEDGE_BASE_PATH`
 
-## Railway Deploy
+## Render Deploy
 
-Проект уже подготовлен под Railway:
+The project is prepared for Render as a background worker.
 
-- зависимости берутся из `requirements.txt`;
-- worker-команда задана как `python bot.py`;
-- добавлены `Procfile` и `railway.json`.
+- build command: `pip install -r requirements.txt`
+- start command: `python bot.py`
+- service type: `worker`
 
-Нужно указать в Railway такие переменные:
+Configuration is included in [render.yaml](./render.yaml).
+
+Required environment variables on Render:
 
 - `BOT_TOKEN`
 - `GEMINI_API_KEY`
