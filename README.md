@@ -40,11 +40,13 @@ python bot.py
 
 ## Render Deploy
 
-The project is prepared for Render as a background worker.
+The project is prepared for Render as a web service.
 
 - build command: `pip install -r requirements.txt`
 - start command: `python bot.py`
-- service type: `worker`
+- service type: `web`
+
+The bot also starts a tiny health endpoint on `PORT` for Render, while the Telegram polling keeps running in the same process.
 
 Configuration is included in [render.yaml](./render.yaml).
 
