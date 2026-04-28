@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -25,6 +26,33 @@ def configure_logging(settings: Settings) -> None:
     )
 
 
+async def run_health_server() -> None:
+    port = os.getenv("PORT", "").strip()
+    if not port:
+        await asyncio.Event().wait()
+        return
+
+    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            await reader.read(1024)
+            body = b"ok"
+            writer.write(
+                b"HTTP/1.1 200 OK\r\n"
+                b"Content-Type: text/plain; charset=utf-8\r\n"
+                b"Content-Length: 2\r\n"
+                b"Connection: close\r\n\r\n" + body
+            )
+            await writer.drain()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    server = await asyncio.start_server(handle_client, host="0.0.0.0", port=int(port))
+    logging.getLogger(__name__).info("Health server started on port %s", port)
+    async with server:
+        await server.serve_forever()
+
+
 async def run() -> None:
     settings = load_settings()
     configure_logging(settings)
@@ -46,7 +74,17 @@ async def run() -> None:
     dispatcher.include_router(qa_router)
 
     logging.getLogger(__name__).info("iiko knowledge bot started.")
-    await dispatcher.start_polling(bot)
+    health_task = asyncio.create_task(run_health_server())
+    polling_task = asyncio.create_task(dispatcher.start_polling(bot))
+
+    done, pending = await asyncio.wait(
+        {health_task, polling_task},
+        return_when=asyncio.FIRST_EXCEPTION,
+    )
+    for task in pending:
+        task.cancel()
+    for task in done:
+        task.result()
 
 
 def main() -> None:
