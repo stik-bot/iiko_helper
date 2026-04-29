@@ -48,6 +48,12 @@ The project is prepared for Render as a web service.
 
 The bot also starts a tiny health endpoint on `PORT` for Render, while the Telegram polling keeps running in the same process.
 
+On Render, it is better to use Telegram webhook mode instead of long polling.
+Set:
+
+- `WEBHOOK_BASE_URL=https://iiko-helper-bot.onrender.com`
+- `WEBHOOK_PATH=/telegram/webhook`
+
 Configuration is included in [render.yaml](./render.yaml).
 
 Required environment variables on Render:
