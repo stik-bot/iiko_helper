@@ -21,3 +21,7 @@ services:
         value: storage
       - key: KNOWLEDGE_BASE_PATH
         value: knowledge/iiko_sources.json
+      - key: WEBHOOK_BASE_URL
+        value: https://iiko-helper-bot.onrender.com
+      - key: WEBHOOK_PATH
+        value: /telegram/webhook
