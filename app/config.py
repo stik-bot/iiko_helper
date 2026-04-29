@@ -19,6 +19,8 @@ class Settings:
     log_level: str
     storage_dir: Path
     knowledge_base_path: Path
+    webhook_base_url: str
+    webhook_path: str
 
 
 def load_settings() -> Settings:
@@ -29,6 +31,8 @@ def load_settings() -> Settings:
     storage_dir = Path(os.getenv("STORAGE_DIR", "storage")).resolve()
     knowledge_base_path = Path(os.getenv("KNOWLEDGE_BASE_PATH", "knowledge/iiko_sources.json")).resolve()
     log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO"
+    webhook_base_url = os.getenv("WEBHOOK_BASE_URL", "").strip().rstrip("/")
+    webhook_path = os.getenv("WEBHOOK_PATH", "/telegram/webhook").strip() or "/telegram/webhook"
 
     if not token:
         raise ValueError("BOT_TOKEN or TELEGRAM_BOT_TOKEN is required.")
@@ -47,4 +51,6 @@ def load_settings() -> Settings:
         log_level=log_level,
         storage_dir=storage_dir,
         knowledge_base_path=knowledge_base_path,
+        webhook_base_url=webhook_base_url,
+        webhook_path=webhook_path,
     )
