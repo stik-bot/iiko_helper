@@ -4,11 +4,10 @@ import asyncio
 import logging
 import os
 
-from aiohttp import web
+from aiohttp import ClientSession, web
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from app.config import Settings, load_settings
 from app.handlers.common import router as common_router
@@ -62,31 +61,34 @@ async def on_polling_startup(bot: Bot) -> None:
     logging.getLogger(__name__).info("Webhook disabled, polling mode enabled.")
 
 
-async def run_webhook(settings: Settings) -> None:
-    bot, dispatcher = build_dispatcher(settings)
-
+async def start_health_server(port: int) -> web.AppRunner:
     app = web.Application()
     app.router.add_get("/", health_handler)
     app.router.add_get("/health", health_handler)
 
-    webhook_handler = SimpleRequestHandler(dispatcher=dispatcher, bot=bot)
-    webhook_handler.register(app, path=settings.webhook_path)
-    setup_application(app, dispatcher, bot=bot)
-
-    await on_webhook_startup(bot, settings)
-
     runner = web.AppRunner(app)
     await runner.setup()
-    port = int(os.getenv("PORT", "10000"))
     site = web.TCPSite(runner, host="0.0.0.0", port=port)
-    logging.getLogger(__name__).info("Webhook server starting on port %s", port)
     await site.start()
+    logging.getLogger(__name__).info("Health server started on port %s", port)
+    return runner
 
-    try:
-        await asyncio.Event().wait()
-    finally:
-        await runner.cleanup()
-        await bot.session.close()
+
+async def keep_service_awake(settings: Settings) -> None:
+    if not settings.webhook_base_url:
+        return
+
+    health_url = f"{settings.webhook_base_url.rstrip('/')}/health"
+    logger = logging.getLogger(__name__)
+
+    async with ClientSession() as session:
+        while True:
+            try:
+                async with session.get(health_url, timeout=20) as response:
+                    logger.info("Self-ping %s -> %s", health_url, response.status)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Self-ping failed: %s", exc)
+            await asyncio.sleep(300)
 
 
 async def run_polling(settings: Settings) -> None:
@@ -96,13 +98,30 @@ async def run_polling(settings: Settings) -> None:
     await dispatcher.start_polling(bot)
 
 
+async def run_render_service(settings: Settings) -> None:
+    bot, dispatcher = build_dispatcher(settings)
+    await on_polling_startup(bot)
+
+    port = int(os.getenv("PORT", "10000"))
+    runner = await start_health_server(port)
+    keepalive_task = asyncio.create_task(keep_service_awake(settings))
+
+    logging.getLogger(__name__).info("Starting Render web service mode with Telegram polling.")
+    try:
+        await dispatcher.start_polling(bot)
+    finally:
+        keepalive_task.cancel()
+        await runner.cleanup()
+        await bot.session.close()
+
+
 async def run() -> None:
     settings = load_settings()
     configure_logging(settings)
 
-    if settings.webhook_base_url and os.getenv("PORT", "").strip():
-        logging.getLogger(__name__).info("Starting in webhook mode.")
-        await run_webhook(settings)
+    if os.getenv("PORT", "").strip():
+        logging.getLogger(__name__).info("Starting in Render service mode.")
+        await run_render_service(settings)
         return
 
     logging.getLogger(__name__).info("Starting in polling mode.")
