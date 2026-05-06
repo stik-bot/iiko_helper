@@ -15,6 +15,33 @@ from app.services.gemini_service import GeminiQuotaError, GeminiService
 
 logger = logging.getLogger(__name__)
 router = Router()
+TELEGRAM_MESSAGE_LIMIT = 4000
+
+
+async def send_long_answer(message: Message, text: str) -> None:
+    normalized = (text or "").strip()
+    if not normalized:
+        await message.answer("Не получилось сформировать ответ.")
+        return
+
+    remainder = normalized
+    while remainder:
+        if len(remainder) <= TELEGRAM_MESSAGE_LIMIT:
+            await message.answer(remainder)
+            return
+
+        split_at = remainder.rfind("\n\n", 0, TELEGRAM_MESSAGE_LIMIT)
+        if split_at == -1:
+            split_at = remainder.rfind("\n", 0, TELEGRAM_MESSAGE_LIMIT)
+        if split_at == -1:
+            split_at = remainder.rfind(" ", 0, TELEGRAM_MESSAGE_LIMIT)
+        if split_at == -1 or split_at < TELEGRAM_MESSAGE_LIMIT // 2:
+            split_at = TELEGRAM_MESSAGE_LIMIT
+
+        chunk = remainder[:split_at].strip()
+        if chunk:
+            await message.answer(chunk)
+        remainder = remainder[split_at:].strip()
 
 
 @router.message(F.photo)
@@ -33,12 +60,12 @@ async def photo_question_handler(
     if caption:
         factual_answer = knowledge_base.answer_from_facts(caption)
         if factual_answer:
-            await message.answer(factual_answer)
+            await send_long_answer(message, factual_answer)
             return
 
         direct_answer = knowledge_base.answer_from_guides(caption)
         if direct_answer:
-            await message.answer(direct_answer)
+            await send_long_answer(message, direct_answer)
             return
 
     context = knowledge_base.render_context(
@@ -86,7 +113,7 @@ async def photo_question_handler(
         await message.answer(f"Не смог обработать фото.\n\nПричина: <code>{html.escape(str(exc))}</code>")
         return
 
-    await message.answer(answer)
+    await send_long_answer(message, answer)
 
 
 @router.message(F.text & ~F.via_bot)
@@ -101,12 +128,12 @@ async def text_question_handler(
 
     factual_answer = knowledge_base.answer_from_facts(question)
     if factual_answer:
-        await message.answer(factual_answer)
+        await send_long_answer(message, factual_answer)
         return
 
     direct_answer = knowledge_base.answer_from_guides(question)
     if direct_answer:
-        await message.answer(direct_answer)
+        await send_long_answer(message, direct_answer)
         return
 
     context = knowledge_base.render_context(question)
@@ -124,4 +151,4 @@ async def text_question_handler(
         await message.answer(f"Не смог ответить на вопрос.\n\nПричина: <code>{html.escape(str(exc))}</code>")
         return
 
-    await message.answer(answer)
+    await send_long_answer(message, answer)
