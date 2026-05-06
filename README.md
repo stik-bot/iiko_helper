@@ -5,7 +5,8 @@ Telegram bot on `aiogram` that:
 - answers iiko questions;
 - uses `Gemini` for text and image-based questions;
 - accepts photos with tests, screenshots, and tasks;
-- uses a local iiko knowledge base plus Gemini.
+- uses a local iiko knowledge base plus Gemini;
+- can use local certification materials synced from iiko iSpring Learn.
 
 ## Features
 
@@ -13,6 +14,7 @@ Telegram bot on `aiogram` that:
 - photo test analysis, including questions with multiple answer options;
 - Russian-language answers;
 - source links in replies;
+- extended local context from iiko certification materials;
 - ready for local run and Render deploy.
 
 ## Commands
@@ -37,6 +39,20 @@ python bot.py
 - `LOG_LEVEL`
 - `STORAGE_DIR`
 - `KNOWLEDGE_BASE_PATH`
+- `ISPRING_LOGIN` (optional, for syncing certification materials)
+- `ISPRING_PASSWORD` (optional, for syncing certification materials)
+
+## Sync Certification Materials
+
+To refresh the local certification knowledge from iiko iSpring Learn:
+
+```powershell
+$env:ISPRING_LOGIN="your_login"
+$env:ISPRING_PASSWORD="your_password"
+python scripts/sync_ispring_certification.py
+```
+
+The script writes the synced dataset to `knowledge/ispring_certification.json`.
 
 ## Render Deploy
 
