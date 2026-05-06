@@ -8,6 +8,7 @@ from aiohttp import ClientSession, web
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from app.config import Settings, load_settings
 from app.handlers.common import router as common_router
@@ -61,8 +62,7 @@ async def on_polling_startup(bot: Bot) -> None:
     logging.getLogger(__name__).info("Webhook disabled, polling mode enabled.")
 
 
-async def start_health_server(port: int) -> web.AppRunner:
-    app = web.Application()
+async def start_health_server(port: int, app: web.Application) -> web.AppRunner:
     app.router.add_get("/", health_handler)
     app.router.add_get("/health", health_handler)
 
@@ -100,15 +100,20 @@ async def run_polling(settings: Settings) -> None:
 
 async def run_render_service(settings: Settings) -> None:
     bot, dispatcher = build_dispatcher(settings)
-    await on_polling_startup(bot)
+    app = web.Application()
+
+    webhook_handler = SimpleRequestHandler(dispatcher=dispatcher, bot=bot)
+    webhook_handler.register(app, path=settings.webhook_path)
+    setup_application(app, dispatcher, bot=bot)
 
     port = int(os.getenv("PORT", "10000"))
-    runner = await start_health_server(port)
+    runner = await start_health_server(port, app)
     keepalive_task = asyncio.create_task(keep_service_awake(settings))
 
-    logging.getLogger(__name__).info("Starting Render web service mode with Telegram polling.")
+    await on_webhook_startup(bot, settings)
+    logging.getLogger(__name__).info("Starting Render web service mode with Telegram webhook.")
     try:
-        await dispatcher.start_polling(bot)
+        await asyncio.Event().wait()
     finally:
         keepalive_task.cancel()
         await runner.cleanup()
