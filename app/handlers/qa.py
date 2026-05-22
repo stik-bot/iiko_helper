@@ -11,6 +11,7 @@ from aiogram.types import Message
 from app.config import Settings
 from app.knowledge_base import KnowledgeBase
 from app.services.gemini_service import GeminiQuotaError, GeminiService
+from app.services.payment_access import PaymentAccessService
 
 
 logger = logging.getLogger(__name__)
@@ -44,14 +45,50 @@ async def send_long_answer(message: Message, text: str) -> None:
         remainder = remainder[split_at:].strip()
 
 
+async def try_issue_payment_code(
+    message: Message,
+    *,
+    payment_access_service: PaymentAccessService,
+    settings: Settings,
+    receipt_kind: str,
+    receipt_file_id: str,
+) -> bool:
+    if not await payment_access_service.is_awaiting_receipt(message.from_user.id):
+        return False
+
+    code = await payment_access_service.issue_access_code(
+        user_id=message.from_user.id,
+        username=message.from_user.username or "",
+        receipt_kind=receipt_kind,
+        receipt_file_id=receipt_file_id,
+        price_uzs=settings.payment_price_uzs,
+    )
+    await message.answer(
+        "Чек получен.\n\n"
+        f"Ваш код активации: <code>{html.escape(code)}</code>\n\n"
+        "Вернитесь на сайт, откройте оплату, вставьте этот код и активируйте доступ на 30 дней."
+    )
+    return True
+
+
 @router.message(F.photo)
 async def photo_question_handler(
     message: Message,
     settings: Settings,
     knowledge_base: KnowledgeBase,
     gemini_service: GeminiService,
+    payment_access_service: PaymentAccessService,
 ) -> None:
-    await message.answer("Смотрю фото и разбираю вопросы...")
+    if await try_issue_payment_code(
+        message,
+        payment_access_service=payment_access_service,
+        settings=settings,
+        receipt_kind="photo",
+        receipt_file_id=message.photo[-1].file_id,
+    ):
+        return
+
+    await message.answer("Смотрю фото и разбираю вопрос...")
     photo = message.photo[-1]
     target_path = settings.storage_dir / f"{uuid4().hex}.jpg"
     await message.bot.download(photo, destination=target_path)
@@ -68,45 +105,39 @@ async def photo_question_handler(
             await send_long_answer(message, direct_answer)
             return
 
-    context = knowledge_base.render_context(
-        caption or "вопросы по iiko сотрудники скидки группы отделения изъятия торговое предприятие",
-        limit=10,
-    )
+    context = knowledge_base.render_context(caption or "вопросы по iiko", limit=10)
     try:
         answer = await gemini_service.answer_image_question(target_path, caption, context)
     except GeminiQuotaError as exc:
         logger.warning("Gemini quota exceeded for image question: %s", exc)
         if exc.retry_after_seconds and exc.retry_after_seconds <= 90:
             await message.answer(
-                f"Лимит Gemini временно исчерпан. Подожду около {exc.retry_after_seconds} сек. и попробую обработать фото автоматически ещё раз."
+                f"Лимит Gemini временно исчерпан. Подожду около {exc.retry_after_seconds} сек. и попробую обработать фото ещё раз."
             )
             await asyncio.sleep(exc.retry_after_seconds + 1)
             try:
                 answer = await gemini_service.answer_image_question(target_path, caption, context)
             except GeminiQuotaError as retry_exc:
                 logger.warning("Gemini quota still exceeded after retry: %s", retry_exc)
-                fallback_text = (
+                await message.answer(
                     "Повторная попытка тоже упёрлась в лимит Gemini.\n\n"
-                    "Попробуй снова позже или отправь вопрос с картинки текстом."
+                    "Попробуйте позже или отправьте вопрос по фото текстом.\n\n"
+                    f"Причина: <code>{html.escape(str(retry_exc))}</code>"
                 )
-                if caption:
-                    fallback_text += "\n\nЕсли вопрос уже есть в локальной базе, текстом бот ответит без Gemini."
-                await message.answer(f"{fallback_text}\n\nПричина: <code>{html.escape(str(retry_exc))}</code>")
                 return
             except Exception as retry_exc:  # noqa: BLE001
                 logger.exception("Failed to answer image question after retry.")
                 await message.answer(
-                    f"Не смог обработать фото после повторной попытки.\n\nПричина: <code>{html.escape(str(retry_exc))}</code>"
+                    "Не смог обработать фото после повторной попытки.\n\n"
+                    f"Причина: <code>{html.escape(str(retry_exc))}</code>"
                 )
                 return
         else:
-            fallback_text = (
+            await message.answer(
                 "Сейчас лимит Gemini временно исчерпан, поэтому фото не удалось разобрать.\n\n"
-                "Попробуй снова чуть позже или отправь вопрос с картинки текстом."
+                "Попробуйте позже или отправьте вопрос по фото текстом.\n\n"
+                f"Причина: <code>{html.escape(str(exc))}</code>"
             )
-            if caption:
-                fallback_text += "\n\nЕсли вопрос уже есть в локальной базе, текстом бот ответит без Gemini."
-            await message.answer(f"{fallback_text}\n\nПричина: <code>{html.escape(str(exc))}</code>")
             return
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to answer image question.")
@@ -116,12 +147,34 @@ async def photo_question_handler(
     await send_long_answer(message, answer)
 
 
+@router.message(F.document)
+async def document_handler(
+    message: Message,
+    settings: Settings,
+    payment_access_service: PaymentAccessService,
+) -> None:
+    if await try_issue_payment_code(
+        message,
+        payment_access_service=payment_access_service,
+        settings=settings,
+        receipt_kind="document",
+        receipt_file_id=message.document.file_id,
+    ):
+        return
+    await message.answer("Документ получен. Для оплаты используйте /pay, для вопросов отправьте текст или фото.")
+
+
 @router.message(F.text & ~F.via_bot)
 async def text_question_handler(
     message: Message,
     knowledge_base: KnowledgeBase,
     gemini_service: GeminiService,
+    payment_access_service: PaymentAccessService,
 ) -> None:
+    if await payment_access_service.is_awaiting_receipt(message.from_user.id):
+        await message.answer("Я жду от вас фискальный чек. Отправьте его фото или файлом, и я выдам код активации.")
+        return
+
     question = (message.text or "").strip()
     if not question:
         return
@@ -142,7 +195,7 @@ async def text_question_handler(
     except GeminiQuotaError as exc:
         logger.warning("Gemini quota exceeded for text question: %s", exc)
         await message.answer(
-            "Сейчас лимит Gemini временно исчерпан. Попробуй отправить вопрос чуть позже.\n\n"
+            "Сейчас лимит Gemini временно исчерпан. Попробуйте отправить вопрос чуть позже.\n\n"
             f"Причина: <code>{html.escape(str(exc))}</code>"
         )
         return

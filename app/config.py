@@ -21,6 +21,10 @@ class Settings:
     knowledge_base_path: Path
     webhook_base_url: str
     webhook_path: str
+    payment_card_number: str
+    payment_price_uzs: int
+    payment_bot_username: str
+    payment_site_url: str
 
 
 def load_settings() -> Settings:
@@ -33,6 +37,10 @@ def load_settings() -> Settings:
     log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO"
     webhook_base_url = os.getenv("WEBHOOK_BASE_URL", "").strip().rstrip("/")
     webhook_path = os.getenv("WEBHOOK_PATH", "/telegram/webhook").strip() or "/telegram/webhook"
+    payment_card_number = os.getenv("PAYMENT_CARD_NUMBER", "9860160602619274").strip()
+    payment_price_uzs = int(os.getenv("PAYMENT_PRICE_UZS", "1000").strip() or "1000")
+    payment_bot_username = os.getenv("PAYMENT_BOT_USERNAME", "Sct_xo_Payment_BOT").strip() or "Sct_xo_Payment_BOT"
+    payment_site_url = os.getenv("PAYMENT_SITE_URL", "https://moonlit-mandazi-a36f2c.netlify.app").strip()
 
     if not token:
         raise ValueError("BOT_TOKEN or TELEGRAM_BOT_TOKEN is required.")
@@ -53,4 +61,8 @@ def load_settings() -> Settings:
         knowledge_base_path=knowledge_base_path,
         webhook_base_url=webhook_base_url,
         webhook_path=webhook_path,
+        payment_card_number=payment_card_number,
+        payment_price_uzs=payment_price_uzs,
+        payment_bot_username=payment_bot_username,
+        payment_site_url=payment_site_url,
     )

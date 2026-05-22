@@ -25,3 +25,11 @@ services:
         value: https://iiko-helper-bot.onrender.com
       - key: WEBHOOK_PATH
         value: /telegram/webhook
+      - key: PAYMENT_CARD_NUMBER
+        value: 9860160602619274
+      - key: PAYMENT_PRICE_UZS
+        value: 1000
+      - key: PAYMENT_BOT_USERNAME
+        value: Sct_xo_Payment_BOT
+      - key: PAYMENT_SITE_URL
+        value: https://moonlit-mandazi-a36f2c.netlify.app

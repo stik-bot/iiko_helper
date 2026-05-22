@@ -15,6 +15,7 @@ from app.handlers.common import router as common_router
 from app.handlers.qa import router as qa_router
 from app.knowledge_base import KnowledgeBase
 from app.services.gemini_service import GeminiService
+from app.services.payment_access import PaymentAccessService
 
 
 def configure_logging(settings: Settings) -> None:
@@ -28,9 +29,10 @@ def configure_logging(settings: Settings) -> None:
     )
 
 
-def build_dispatcher(settings: Settings) -> tuple[Bot, Dispatcher]:
+def build_dispatcher(settings: Settings) -> tuple[Bot, Dispatcher, PaymentAccessService]:
     knowledge_base = KnowledgeBase(settings.knowledge_base_path)
     gemini_service = GeminiService(settings.gemini_api_key, settings.gemini_model)
+    payment_access_service = PaymentAccessService(settings.storage_dir)
 
     bot = Bot(
         token=settings.telegram_bot_token,
@@ -41,14 +43,39 @@ def build_dispatcher(settings: Settings) -> tuple[Bot, Dispatcher]:
         settings=settings,
         knowledge_base=knowledge_base,
         gemini_service=gemini_service,
+        payment_access_service=payment_access_service,
     )
     dispatcher.include_router(common_router)
     dispatcher.include_router(qa_router)
-    return bot, dispatcher
+    return bot, dispatcher, payment_access_service
 
 
 async def health_handler(_: web.Request) -> web.Response:
     return web.Response(text="ok")
+
+
+def json_response(payload: dict, status: int = 200) -> web.Response:
+    response = web.json_response(payload, status=status)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    return response
+
+
+async def payment_activate_handler(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return json_response({"ok": True})
+
+    service: PaymentAccessService = request.app["payment_access_service"]
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001
+        payload = {}
+    code = str(payload.get("code", "")).strip()
+    result = await service.activate_code(code)
+    if not result.ok:
+        return json_response({"ok": False, "message": result.message}, status=400)
+    return json_response({"ok": True, "paid_until": result.paid_until_iso, "message": result.message})
 
 
 async def on_webhook_startup(bot: Bot, settings: Settings) -> None:
@@ -65,6 +92,8 @@ async def on_polling_startup(bot: Bot) -> None:
 async def start_health_server(port: int, app: web.Application) -> web.AppRunner:
     app.router.add_get("/", health_handler)
     app.router.add_get("/health", health_handler)
+    app.router.add_route("POST", "/payment/activate", payment_activate_handler)
+    app.router.add_route("OPTIONS", "/payment/activate", payment_activate_handler)
 
     runner = web.AppRunner(app)
     await runner.setup()
@@ -92,15 +121,16 @@ async def keep_service_awake(settings: Settings) -> None:
 
 
 async def run_polling(settings: Settings) -> None:
-    bot, dispatcher = build_dispatcher(settings)
+    bot, dispatcher, _payment_access_service = build_dispatcher(settings)
     await on_polling_startup(bot)
     logging.getLogger(__name__).info("iiko knowledge bot started in polling mode.")
     await dispatcher.start_polling(bot)
 
 
 async def run_render_service(settings: Settings) -> None:
-    bot, dispatcher = build_dispatcher(settings)
+    bot, dispatcher, payment_access_service = build_dispatcher(settings)
     app = web.Application()
+    app["payment_access_service"] = payment_access_service
 
     webhook_handler = SimpleRequestHandler(dispatcher=dispatcher, bot=bot)
     webhook_handler.register(app, path=settings.webhook_path)
