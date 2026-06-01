@@ -6,6 +6,7 @@ Telegram bot on `aiogram` that:
 - uses `Gemini` for text and image-based questions;
 - accepts photos with tests, screenshots, and tasks;
 - uses a local iiko knowledge base plus Gemini;
+- accepts payment receipt screenshots and issues one-time site activation codes;
 - can use local certification materials synced from iiko iSpring Learn.
 
 ## Features
@@ -15,6 +16,7 @@ Telegram bot on `aiogram` that:
 - Russian-language answers;
 - source links in replies;
 - extended local context from iiko certification materials;
+- `/pay` flow for site subscriptions: card instructions, receipt upload, one-time code, and `/payment/activate` API;
 - ready for local run and Render deploy.
 
 ## Commands
@@ -22,6 +24,7 @@ Telegram bot on `aiogram` that:
 - `/start`
 - `/help`
 - `/sources`
+- `/pay`
 
 ## Local Run
 
@@ -39,8 +42,35 @@ python bot.py
 - `LOG_LEVEL`
 - `STORAGE_DIR`
 - `KNOWLEDGE_BASE_PATH`
+- `WEBHOOK_BASE_URL`
+- `WEBHOOK_PATH`
+- `PAYMENT_CARD_NUMBER`
+- `PAYMENT_PRICE_UZS`
+- `PAYMENT_BOT_USERNAME`
+- `PAYMENT_SITE_URL`
 - `ISPRING_LOGIN` (optional, for syncing certification materials)
 - `ISPRING_PASSWORD` (optional, for syncing certification materials)
+
+## Site Payment Flow
+
+The static site opens Telegram with:
+
+```text
+https://t.me/<PAYMENT_BOT_USERNAME>?start=site_payment
+```
+
+The bot marks the user as waiting for a receipt. After the user sends a receipt screenshot or file, the bot creates a code like `VV-1A2B3C4D`.
+
+The site activates that code through the bot web service:
+
+```http
+POST /payment/activate
+Content-Type: application/json
+
+{"code":"VV-1A2B3C4D"}
+```
+
+Codes are one-time use and grant 30 days of access. The site also reads `/payment/config` so the bot username and price stay in sync with Render environment variables.
 
 ## Sync Certification Materials
 
@@ -81,3 +111,7 @@ Required environment variables on Render:
 - `LOG_PATH=logs/iiko_knowledge_bot.log`
 - `STORAGE_DIR=storage`
 - `KNOWLEDGE_BASE_PATH=knowledge/iiko_sources.json`
+- `PAYMENT_CARD_NUMBER=9860160602619274`
+- `PAYMENT_PRICE_UZS=1000`
+- `PAYMENT_BOT_USERNAME=Sct_xo_Payment_BOT`
+- `PAYMENT_SITE_URL=https://moonlit-mandazi-a36f2c.netlify.app`

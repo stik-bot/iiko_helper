@@ -58,7 +58,7 @@ def json_response(payload: dict, status: int = 200) -> web.Response:
     response = web.json_response(payload, status=status)
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
 
@@ -78,6 +78,18 @@ async def payment_activate_handler(request: web.Request) -> web.Response:
     return json_response({"ok": True, "paid_until": result.paid_until_iso, "message": result.message})
 
 
+async def payment_config_handler(request: web.Request) -> web.Response:
+    settings: Settings = request.app["settings"]
+    return json_response(
+        {
+            "ok": True,
+            "bot_username": settings.payment_bot_username,
+            "price_uzs": settings.payment_price_uzs,
+            "site_url": settings.payment_site_url,
+        }
+    )
+
+
 async def on_webhook_startup(bot: Bot, settings: Settings) -> None:
     webhook_url = f"{settings.webhook_base_url}{settings.webhook_path}"
     await bot.set_webhook(webhook_url, allowed_updates=["message"])
@@ -92,6 +104,7 @@ async def on_polling_startup(bot: Bot) -> None:
 async def start_health_server(port: int, app: web.Application) -> web.AppRunner:
     app.router.add_get("/", health_handler)
     app.router.add_get("/health", health_handler)
+    app.router.add_get("/payment/config", payment_config_handler)
     app.router.add_route("POST", "/payment/activate", payment_activate_handler)
     app.router.add_route("OPTIONS", "/payment/activate", payment_activate_handler)
 
@@ -130,6 +143,7 @@ async def run_polling(settings: Settings) -> None:
 async def run_render_service(settings: Settings) -> None:
     bot, dispatcher, payment_access_service = build_dispatcher(settings)
     app = web.Application()
+    app["settings"] = settings
     app["payment_access_service"] = payment_access_service
 
     webhook_handler = SimpleRequestHandler(dispatcher=dispatcher, bot=bot)
