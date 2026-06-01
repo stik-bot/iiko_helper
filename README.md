@@ -114,4 +114,4 @@ Required environment variables on Render:
 - `PAYMENT_CARD_NUMBER=9860160602619274`
 - `PAYMENT_PRICE_UZS=1000`
 - `PAYMENT_BOT_USERNAME=Sct_xo_Payment_BOT`
-- `PAYMENT_SITE_URL=https://moonlit-mandazi-a36f2c.netlify.app`
+- `PAYMENT_SITE_URL=https://vedavector-iiko.netlify.app`

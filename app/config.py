@@ -40,7 +40,7 @@ def load_settings() -> Settings:
     payment_card_number = os.getenv("PAYMENT_CARD_NUMBER", "9860160602619274").strip()
     payment_price_uzs = int(os.getenv("PAYMENT_PRICE_UZS", "1000").strip() or "1000")
     payment_bot_username = os.getenv("PAYMENT_BOT_USERNAME", "Sct_xo_Payment_BOT").strip() or "Sct_xo_Payment_BOT"
-    payment_site_url = os.getenv("PAYMENT_SITE_URL", "https://moonlit-mandazi-a36f2c.netlify.app").strip()
+    payment_site_url = os.getenv("PAYMENT_SITE_URL", "https://vedavector-iiko.netlify.app").strip()
 
     if not token:
         raise ValueError("BOT_TOKEN or TELEGRAM_BOT_TOKEN is required.")
