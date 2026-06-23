@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+DEFAULT_PAYMENT_PRICE_UZS = 100_000
+
 
 @dataclass(slots=True)
 class Settings:
@@ -23,6 +25,7 @@ class Settings:
     webhook_path: str
     payment_card_number: str
     payment_price_uzs: int
+    payment_owner_name: str
     payment_bot_username: str
     payment_site_url: str
 
@@ -38,7 +41,9 @@ def load_settings() -> Settings:
     webhook_base_url = os.getenv("WEBHOOK_BASE_URL", "").strip().rstrip("/")
     webhook_path = os.getenv("WEBHOOK_PATH", "/telegram/webhook").strip() or "/telegram/webhook"
     payment_card_number = os.getenv("PAYMENT_CARD_NUMBER", "9860160602619274").strip()
-    payment_price_uzs = int(os.getenv("PAYMENT_PRICE_UZS", "1000").strip() or "1000")
+    configured_payment_price_uzs = int(os.getenv("PAYMENT_PRICE_UZS", str(DEFAULT_PAYMENT_PRICE_UZS)).strip() or str(DEFAULT_PAYMENT_PRICE_UZS))
+    payment_price_uzs = max(DEFAULT_PAYMENT_PRICE_UZS, configured_payment_price_uzs)
+    payment_owner_name = os.getenv("PAYMENT_OWNER_NAME", "Sultanov Samandar").strip() or "Sultanov Samandar"
     payment_bot_username = os.getenv("PAYMENT_BOT_USERNAME", "Sct_xo_Payment_BOT").strip() or "Sct_xo_Payment_BOT"
     payment_site_url = os.getenv("PAYMENT_SITE_URL", "https://vedavector-iiko.netlify.app").strip()
 
@@ -63,6 +68,7 @@ def load_settings() -> Settings:
         webhook_path=webhook_path,
         payment_card_number=payment_card_number,
         payment_price_uzs=payment_price_uzs,
+        payment_owner_name=payment_owner_name,
         payment_bot_username=payment_bot_username,
         payment_site_url=payment_site_url,
     )

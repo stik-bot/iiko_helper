@@ -28,7 +28,9 @@ services:
       - key: PAYMENT_CARD_NUMBER
         value: 9860160602619274
       - key: PAYMENT_PRICE_UZS
-        value: 1000
+        value: 100000
+      - key: PAYMENT_OWNER_NAME
+        value: Sultanov Samandar
       - key: PAYMENT_BOT_USERNAME
         value: Sct_xo_Payment_BOT
       - key: PAYMENT_SITE_URL
